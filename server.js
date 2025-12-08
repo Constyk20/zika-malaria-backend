@@ -40,6 +40,7 @@ app.use('/api/patients', require('./routes/patients'));
 app.use('/api/zika', require('./routes/zika'));
 app.use('/api/malaria', require('./routes/malaria'));
 
+
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error('Server error:', err.message);
