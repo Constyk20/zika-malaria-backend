@@ -1,65 +1,61 @@
-// routes/malaria.js - Malaria Detection using YOUR TFLite model
+// routes/malaria.js - Malaria Detection (model in routes/models/)
 const express = require('express');
 const multer = require('multer');
 const tf = require('@tensorflow/tfjs-node');
 const fs = require('fs');
+const sharp = require('sharp');
 const router = express.Router();
 const auth = require('../middleware/auth');
 
 const upload = multer({ dest: 'uploads/' });
 
-// Load TFLite model once
+// Load TFLite model from routes/models/
 let interpreter;
 (async () => {
-  const modelPath = 'file://./models/malaria_lite.tflite';
-  interpreter = await tf.node.tfLiteInterpreter(modelPath);
-  console.log("TFLite Malaria model loaded!");
+  const modelPath = 'file://./routes/models/malaria_lite.tflite';
+  interpreter = await tf.node.loadSavedModel(modelPath);
+  console.log('TFLite Malaria model loaded from routes/models/');
 })();
 
 router.post('/detect', auth, upload.single('image'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ message: 'No image' });
 
-    // Read and preprocess image
     const imageBuffer = fs.readFileSync(req.file.path);
-    const tensor = tf.node.decodeImage(imageBuffer)
-      .resizeNearestNeighbor([224, 224])
-      .toFloat()
-      .div(tf.scalar(255.0))
-      .expandDims();
+    const processedImage = await sharp(imageBuffer)
+      .resize(224, 224)
+      .toFormat('jpeg')
+      .toBuffer();
 
-    // Run inference
-    const inputIndex = interpreter.getInputIndex('serving_default_input_1');
-    const outputIndex = interpreter.getOutputIndex('StatefulPartitionedCall');
-    
-    interpreter.setTensor(inputIndex, tensor);
-    interpreter.run();
-    const output = interpreter.getTensor(outputIndex);
-    const prediction = output.dataSync()[0];
+    const tensor = tf.node.decodeImage(processedImage)
+      .expandDims(0)
+      .div(255.0);
 
-    const result = prediction > 0.5 ? "Parasitized" : "Uninfected";
-    const confidence = prediction > 0.5 ? prediction : 1 - prediction;
+    const prediction = interpreter.predict({ 'input': tensor });
+    const predData = await prediction['output'].data();
+    const probability = predData[0];
 
-    // Clean up
+    const result = probability > 0.5 ? "Parasitized" : "Uninfected";
+    const confidence = probability > 0.5 ? probability : 1 - probability;
+
     fs.unlinkSync(req.file.path);
-    tf.dispose([tensor, output]);
+    tensor.dispose();
 
     res.json({
       success: true,
       malaria_detection: {
         result,
-        confidence: Number(confidence.toFixed(4)),
-        parasite_probability: Number(prediction.toFixed(4)),
+        confidenceчат: Number(confidence.toFixed(4)),
+        parasite_probability: Number(probability.toFixed(4)),
         recommendation: result === "Parasitized"
-          ? "URGENT: Start ACT treatment + Confirm with microscopy"
-          : "No malaria parasites detected"
+          ? "URGENT: Start ACT treatment"
+          : "No malaria parasites"
       }
     });
- }
-  catch (error) {
+  } catch (error) {
+    if (req.file) fs.unlinkSync(req.file.path);
     console.error("Malaria AI error:", error);
-    if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
-    res.status(500).json({ success: false, message: "Malaria detection failed" });
+    res.status(500).json({ success: false, message: "Detection failed" });
   }
 });
 

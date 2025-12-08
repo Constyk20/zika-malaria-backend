@@ -1,11 +1,14 @@
-// routes/zika.js - Clinical AI (your ABSUTH model)
+// routes/zika.js - Clinical AI (using real sklearn package)
 const express = require('express');
-const router = express.Router();
-const joblib = require('node-joblib');
+const sklearn = require('sklearn');
 const auth = require('../middleware/auth');
+const Patient = require('../models/Patient');
+const ClinicalRecord = require('../models/ClinicalRecord');
 
-// Load model once at startup
-const model = joblib.loadSync('./models/ABSUTH_early_detection_model.pkl');
+const router = express.Router();
+
+// Load your ABSUTH model
+const model = sklearn.load('./models/ABSUTH_early_detection_model.pkl');
 
 router.post('/predict', auth, async (req, res) => {
   try {
@@ -15,6 +18,8 @@ router.post('/predict', auth, async (req, res) => {
     const has_travel = /yes|lagos|abuja|travel/i.test(travel_history || '') ? 1 : 0;
 
     const features = [[age, is_female, has_travel]];
+    
+    // Run prediction
     const risk = model.predict(features)[0];
     const probability = model.predict_proba(features)[0][1];
 
@@ -29,7 +34,7 @@ router.post('/predict', auth, async (req, res) => {
     res.json({ success: true, prediction });
   } catch (error) {
     console.error("Clinical AI error:", error);
-    res.status(500).json({ success: false, message: "Clinical prediction failed" });
+    res.status(500).json({ success: false, message: "Prediction failed" });
   }
 });
 
