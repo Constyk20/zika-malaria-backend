@@ -103,145 +103,266 @@ class ZikaRiskAssessmentModel {
   /**
    * Calculate base risk from demographic factors
    */
-  calculateBaseRisk(age, sex) {
-      let score = 0;
-      
-      // Age-based risk (U-shaped curve)
-      if (age < 1) score += 0.7;         // Neonates: high risk
-      else if (age <= 12) score += 0.3;  // Children: moderate risk
-      else if (age <= 18) score += 0.2;  // Adolescents: lower risk
-      else if (age <= 35) score += 0.4;  // Young adults: higher risk
-      else if (age <= 50) score += 0.5;  // Middle-aged: highest
-      else if (age <= 65) score += 0.6;  // Older adults: high
-      else score += 0.7;                 // Elderly: very high
-      
-      // Sex-based risk
-      const sexUpper = (sex || '').toUpperCase();
-      if (sexUpper === 'F') {
-          score += 0.4;                    // Females: higher risk (pregnancy considerations)
-      } else if (sexUpper === 'M') {
-          score += 0.2;                    // Males: lower risk
-      } else {
-          score += 0.3;                    // Unknown/other: baseline
-      }
-      
-      return Math.min(score, 1.0);
-  }
+  // Update the calculateBaseRisk method in the ZikaRiskAssessmentModel class:
 
-  /**
-   * Assess travel-related risk
-   */
-  assessTravelRisk(travelHistory = '') {
-      const travelLower = travelHistory.toLowerCase();
-      let riskModifier = 0;
+calculateBaseRisk(age, sex) {
+  let score = 0;
+  
+  // Age-based risk (U-shaped curve)
+  if (age < 1) score += 0.7;         // Neonates: high risk
+  else if (age <= 12) score += 0.3;  // Children: moderate risk
+  else if (age <= 18) score += 0.2;  // Adolescents: lower risk
+  else if (age <= 35) score += 0.4;  // Young adults: higher risk
+  else if (age <= 50) score += 0.5;  // Middle-aged: highest
+  else if (age <= 65) score += 0.6;  // Older adults: high
+  else score += 0.7;                 // Elderly: very high
+  
+  // Sex-based risk
+  const sexUpper = (sex || '').toUpperCase();
+  if (sexUpper === 'F' || sexUpper === 'FEMALE') {
+      score += 0.4;                    // Females: higher risk (pregnancy considerations)
+  } else if (sexUpper === 'M' || sexUpper === 'MALE') {
+      score += 0.2;                    // Males: lower risk
+  } else {
+      score += 0.3;                    // Unknown/other: baseline
+  }
+  
+  return Math.min(score, 1.0);
+}
+
+// Update the assessSymptomSeverity method:
+
+assessSymptomSeverity(symptoms = []) {
+  const symptomWeights = {
+      // High severity symptoms (weight: 0.8-1.0)
+      'fever': 0.9,
+      'rash': 0.8,
+      'joint pain': 0.8,
+      'joint': 0.8,
+      'conjunctivitis': 0.7,
+      'red eyes': 0.7,
+      'red': 0.6,
       
-      // High-risk regions
-      const highRiskPatterns = [
-          /brazil|colombia|venezuela|suriname|guyana/i,
-          /mexico|guatemala|honduras|el salvador|nicaragua/i,
-          /caribbean|jamaica|dominican|haiti|barbados/i,
-          /philippines|thailand|vietnam|cambodia|laos/i,
-          /papua new guinea|fiji|samoa|tonga/i
-      ];
+      // Medium severity symptoms (weight: 0.4-0.6)
+      'headache': 0.5,
+      'muscle pain': 0.5,
+      'muscle': 0.5,
+      'fatigue': 0.4,
+      'malaise': 0.4,
       
-      // Moderate-risk regions
-      const moderateRiskPatterns = [
-          /travel|abroad|foreign|overseas|international/i,
-          /africa|asia|south america|central america/i,
-          /lagos|abuja|port harcourt|kano|ibadan/i
-      ];
-      
-      // Check patterns
-      for (const pattern of highRiskPatterns) {
-          if (pattern.test(travelLower)) {
-              riskModifier = 0.8;
+      // Low severity symptoms (weight: 0.1-0.3)
+      'nausea': 0.3,
+      'vomiting': 0.3,
+      'diarrhea': 0.2
+  };
+  
+  let severityScore = 0;
+  const normalizedSymptoms = symptoms.map(s => s.toLowerCase().trim());
+  
+  // Calculate severity based on symptom weights
+  for (const symptom of normalizedSymptoms) {
+      for (const [pattern, weight] of Object.entries(symptomWeights)) {
+          const symptomLower = symptom.toLowerCase();
+          const patternLower = pattern.toLowerCase();
+          
+          // Check for exact match or contains
+          if (symptomLower === patternLower || 
+              symptomLower.includes(patternLower) || 
+              patternLower.includes(symptomLower)) {
+              severityScore += weight;
+              console.log(`✅ Symptom matched: "${symptom}" -> "${pattern}" (weight: ${weight})`);
               break;
           }
       }
-      
-      if (riskModifier === 0) {
-          for (const pattern of moderateRiskPatterns) {
-              if (pattern.test(travelLower)) {
-                  riskModifier = 0.4;
-                  break;
-              }
-          }
-      }
-      
-      return riskModifier;
   }
+  
+  console.log(`📊 Total severity score: ${severityScore}`);
+  
+  // Normalize to 0-1 scale, but with better scaling
+  // 1-2 symptoms: ÷ 2, 3+ symptoms: ÷ 3, but max at 1.0
+  const normalizationFactor = symptoms.length <= 2 ? 2 : 3;
+  const normalizedScore = Math.min(severityScore / normalizationFactor, 1.0);
+  
+  console.log(`📊 Normalized severity: ${normalizedScore} (÷${normalizationFactor})`);
+  return normalizedScore;
+}
 
-  /**
-   * Assess symptom severity
-   */
-  assessSymptomSeverity(symptoms = []) {
-      const symptomWeights = {
-          // High severity symptoms (weight: 0.8-1.0)
-          'fever': 0.9,
-          'rash': 0.8,
-          'joint pain': 0.8,
-          'conjunctivitis': 0.7,
-          'red eyes': 0.7,
-          
-          // Medium severity symptoms (weight: 0.4-0.6)
-          'headache': 0.5,
-          'muscle pain': 0.5,
-          'fatigue': 0.4,
-          'malaise': 0.4,
-          
-          // Low severity symptoms (weight: 0.1-0.3)
-          'nausea': 0.3,
-          'vomiting': 0.3,
-          'diarrhea': 0.2
-      };
-      
-      let severityScore = 0;
-      const normalizedSymptoms = symptoms.map(s => s.toLowerCase().trim());
-      
-      // Calculate severity based on symptom weights
-      for (const symptom of normalizedSymptoms) {
-          for (const [pattern, weight] of Object.entries(symptomWeights)) {
-              if (symptom.includes(pattern.toLowerCase()) || pattern.toLowerCase().includes(symptom)) {
-                  severityScore += weight;
-                  break;
-              }
-          }
-      }
-      
-      // Normalize to 0-1 scale
-      return Math.min(severityScore / 3, 1.0);
-  }
+// Update the calculateFinalScore method to give more weight to symptoms:
 
-  /**
-   * Assess comorbidities impact
-   */
-  assessComorbidities(comorbidities = []) {
-      const comorbidityWeights = {
-          'pregnancy': 1.2,
-          'immunodeficiency': 1.3,
-          'diabetes': 1.1,
-          'hypertension': 1.05,
-          'asthma': 1.1,
-          'heart disease': 1.2,
-          'kidney disease': 1.15,
-          'liver disease': 1.15,
-          'autoimmune': 1.1
-      };
-      
-      let multiplier = 1.0;
-      const normalizedComorbidities = comorbidities.map(c => c.toLowerCase().trim());
-      
-      for (const condition of normalizedComorbidities) {
-          for (const [pattern, weight] of Object.entries(comorbidityWeights)) {
-              if (condition.includes(pattern.toLowerCase())) {
-                  multiplier *= weight;
-                  break;
-              }
+calculateFinalScore(baseScore, travelModifier, symptomModifier, comorbidityMultiplier) {
+  // Weighted formula with increased symptom importance
+  // Base(30%) + Travel(25%) + Symptoms(35%) + Comorbidities(10%)
+  const weightedScore = (
+      baseScore * 0.3 +
+      travelModifier * 0.25 +
+      symptomModifier * 0.35
+  ) * comorbidityMultiplier;
+  
+  console.log(`📊 Final score calculation:`);
+  console.log(`  Base: ${baseScore.toFixed(2)} × 0.30 = ${(baseScore * 0.3).toFixed(3)}`);
+  console.log(`  Travel: ${travelModifier.toFixed(2)} × 0.25 = ${(travelModifier * 0.25).toFixed(3)}`);
+  console.log(`  Symptoms: ${symptomModifier.toFixed(2)} × 0.35 = ${(symptomModifier * 0.35).toFixed(3)}`);
+  console.log(`  Comorbidity multiplier: ×${comorbidityMultiplier.toFixed(2)}`);
+  console.log(`  Weighted: ${weightedScore.toFixed(3)}`);
+  
+  return Math.min(Math.max(weightedScore, 0), 1);
+}
+
+// Also update the assessTravelRisk to be more sensitive:
+
+assessTravelRisk(travelHistory = '') {
+  const travelLower = travelHistory.toLowerCase();
+  let riskModifier = 0.1; // Start with base risk
+  
+  // High-risk regions
+  const highRiskPatterns = [
+      /brazil|colombia|venezuela|suriname|guyana/i,
+      /mexico|guatemala|honduras|el salvador|nicaragua/i,
+      /caribbean|jamaica|dominican|haiti|barbados/i,
+      /philippines|thailand|vietnam|cambodia|laos/i,
+      /papua new guinea|fiji|samoa|tonga/i
+  ];
+  
+  // Moderate-risk regions
+  const moderateRiskPatterns = [
+      /travel|abroad|foreign|overseas|international/i,
+      /africa|asia|south america|central america/i,
+      /lagos|abuja|port harcourt|kano|ibadan/i,
+      /nigeria|ghana|cameroon|senegal|kenya/i
+  ];
+  
+  // Check high risk patterns first
+  for (const pattern of highRiskPatterns) {
+      if (pattern.test(travelLower)) {
+          riskModifier = 0.8;
+          console.log(`✈️ High-risk travel detected: ${pattern}`);
+          break;
+      }
+  }
+  
+  // If not high risk, check moderate risk
+  if (riskModifier < 0.5) {
+      for (const pattern of moderateRiskPatterns) {
+          if (pattern.test(travelLower)) {
+              riskModifier = 0.6;
+              console.log(`✈️ Moderate-risk travel detected: ${pattern}`);
+              break;
           }
       }
-      
-      return Math.min(multiplier, 1.5);  // Cap at 1.5x
   }
+  
+  // Additional Nigerian cities/states
+  const nigeriaPatterns = [
+      /rivers|delta|bayelsa|akwa ibom|cross river/i,
+      /ondo|ogun|oyo|ekiti|osun/i,
+      /kano|kaduna|katsina|sokoto|zamfara/i,
+      /plateau|benue|nasarawa|kogi|kwara/i
+  ];
+  
+  for (const pattern of nigeriaPatterns) {
+      if (pattern.test(travelLower)) {
+          riskModifier = Math.min(riskModifier + 0.2, 0.9);
+          console.log(`🇳🇬 Nigerian location detected: ${pattern}`);
+          break;
+      }
+  }
+  
+  console.log(`✈️ Travel risk modifier: ${riskModifier}`);
+  return riskModifier;
+}
+
+// Update the categorizeRisk thresholds:
+
+categorizeRisk(score) {
+  console.log(`📊 Categorizing risk score: ${score.toFixed(3)}`);
+  
+  if (score >= 0.7) { // Lowered from 0.8
+      return {
+          level: 'CRITICAL',
+          urgency: 'IMMEDIATE',
+          color: '#DC2626',
+          icon: '⚠️🚨',
+          action: 'Emergency intervention required'
+      };
+  } else if (score >= 0.55) { // Lowered from 0.6
+      return {
+          level: 'HIGH',
+          urgency: 'URGENT',
+          color: '#EA580C',
+          icon: '⚠️',
+          action: 'Same-day assessment needed'
+      };
+  } else if (score >= 0.35) { // Same
+      return {
+          level: 'MODERATE',
+          urgency: 'PRIORITY',
+          color: '#F59E0B',
+          icon: '🔶',
+          action: 'Schedule within 48 hours'
+      };
+  } else if (score >= 0.15) { // Lowered from 0.2
+      return {
+          level: 'LOW',
+          urgency: 'ROUTINE',
+          color: '#10B981',
+          icon: '✅',
+          action: 'Routine follow-up'
+      };
+  } else {
+      return {
+          level: 'VERY LOW',
+          urgency: 'MONITOR',
+          color: '#059669',
+          icon: '📊',
+          action: 'Continue monitoring'
+      };
+  }
+}
+
+// Also update the assessComorbidities to be more sensitive:
+
+assessComorbidities(comorbidities = []) {
+  const comorbidityWeights = {
+      'pregnancy': 1.4, // Increased from 1.2
+      'immunodeficiency': 1.5, // Increased from 1.3
+      'diabetes': 1.2, // Increased from 1.1
+      'hypertension': 1.1, // Increased from 1.05
+      'asthma': 1.2, // Increased from 1.1
+      'heart disease': 1.3, // Increased from 1.2
+      'kidney disease': 1.25, // Increased from 1.15
+      'liver disease': 1.25, // Increased from 1.15
+      'autoimmune': 1.2, // Increased from 1.1
+      'hiv': 1.4,
+      'aids': 1.5,
+      'cancer': 1.3,
+      'transplant': 1.4,
+      'immunosuppressed': 1.4
+  };
+  
+  let multiplier = 1.0;
+  const normalizedComorbidities = comorbidities.map(c => c.toLowerCase().trim());
+  
+  console.log(`🏥 Comorbidities to assess: ${normalizedComorbidities.join(', ')}`);
+  
+  for (const condition of normalizedComorbidities) {
+      for (const [pattern, weight] of Object.entries(comorbidityWeights)) {
+          const conditionLower = condition.toLowerCase();
+          const patternLower = pattern.toLowerCase();
+          
+          if (conditionLower.includes(patternLower) || patternLower.includes(conditionLower)) {
+              multiplier *= weight;
+              console.log(`✅ Comorbidity matched: "${condition}" -> "${pattern}" (×${weight})`);
+              console.log(`🏥 Current multiplier: ${multiplier.toFixed(2)}`);
+              break;
+          }
+      }
+  }
+  
+  const finalMultiplier = Math.min(multiplier, 1.8);  // Increased cap from 1.5 to 1.8
+  console.log(`🏥 Final comorbidity multiplier: ${finalMultiplier.toFixed(2)}`);
+  
+  return finalMultiplier;
+}
 
   /**
    * Calculate final risk score
